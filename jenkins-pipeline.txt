@@ -1,0 +1,43 @@
+pipeline {
+    agent any
+    environment {
+        PYTHON_VENV = "${WORKSPACE}\\venv"  // Windows 路径用双反斜杠
+        TEST_DIR = "D:\\study\\python\\test_case"  // Windows 路径格式
+    }
+    tools {
+        allure 'allure-2.32.2'  // 对应 Jenkins 全局工具配置中的名称
+    }
+    stages {
+        stage('Prepare') {
+            steps {
+                echo '准备测试环境...'
+                bat 'python -m venv %PYTHON_VENV%'  // Windows 用 python 而非 python3
+                bat 'call %PYTHON_VENV%\\Scripts\\activate.bat && pip install --upgrade pip'
+                bat 'call %PYTHON_VENV%\\Scripts\\activate.bat && pip install -r %TEST_DIR%\\requirements.txt'
+                bat 'call %PYTHON_VENV%\\Scripts\\activate.bat && pip install pytest allure-pytest'
+            }
+        }
+        stage('Test') {
+            steps {
+                echo '执行 pytest 测试...'
+                bat 'call %PYTHON_VENV%\\Scripts\\activate.bat && pytest %TEST_DIR% --alluredir=allure-results'
+                archiveArtifacts artifacts: 'allure-results\\**', fingerprint: true  // Windows 路径格式
+            }
+        }
+        stage('Allure Report') {
+            steps {
+                echo '生成 Allure 测试报告...'
+                allure includeProperties: false,
+                       jdk: '',
+                       properties: [],
+                       reportBuildPolicy: 'ALWAYS',
+                       results: [[path: 'allure-results']]
+            }
+        }
+    }
+    post {
+        always { echo '构建完成！' }
+        success { echo '测试全部通过！' }
+        failure { echo '测试失败，请检查！' }
+    }
+}
